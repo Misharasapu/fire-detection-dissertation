@@ -26,6 +26,7 @@ data/
 models/
 figures/
 results/
+secrets/
 
 # Google Drive mount (just in case)
 drive/
