@@ -44,7 +44,8 @@ class FireClassificationDataset(Dataset):
             with open(label_path, 'r') as f:
                 for line in f:
                     class_id = int(line.strip().split()[0])
-                    if class_id in [0, 2]:  # fire or fire+smoke
+                    # ✅ CORRECTED LINE:
+                    if class_id == 1:  # fire
                         label = 1
                         break
 
