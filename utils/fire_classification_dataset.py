@@ -50,3 +50,48 @@ class FireClassificationDataset(Dataset):
                         break
 
         return image, torch.tensor(label, dtype=torch.long)
+
+
+
+class FireClassificationSyntheticDataset(Dataset):
+    def __init__(self, image_dir, label_dir, transform=None):
+        """
+        Args:
+            image_dir (str): Path to folder containing synthetic .jpg images.
+            label_dir (str): Path to folder containing YOLO .txt labels.
+            transform (callable, optional): torchvision transforms to apply.
+        """
+        self.image_dir = image_dir
+        self.label_dir = label_dir
+        self.transform = transform
+
+        # List all .jpg image files in the folder
+        self.image_files = [f for f in os.listdir(self.image_dir) if f.endswith('.jpg')]
+        self.image_files.sort()  # Ensure consistent ordering
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        image_name = self.image_files[idx]
+        image_path = os.path.join(self.image_dir, image_name)
+
+        image = Image.open(image_path).convert("RGB")
+
+        if self.transform:
+            image = self.transform(image)
+
+        label_file = image_name.replace('.jpg', '.txt')
+        label_path = os.path.join(self.label_dir, label_file)
+
+        # 🔁 MSFFD (synthetic) logic: class_id == 0 → fire
+        label = 0
+        if os.path.exists(label_path):
+            with open(label_path, 'r') as f:
+                for line in f:
+                    class_id = int(line.strip().split()[0])
+                    if class_id == 0:  # fire in MSFFD
+                        label = 1
+                        break
+
+        return image, torch.tensor(label, dtype=torch.long)
