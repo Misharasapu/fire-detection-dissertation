@@ -98,21 +98,20 @@ class FireClassificationSyntheticDataset(Dataset):
         return image, torch.tensor(label, dtype=torch.long)
 
 
-
 class FireClassificationMixedDataset(Dataset):
     def __init__(self, real_image_dir, real_label_dir,
-                       syn_image_dir, syn_label_dir,
-                       syn_ratio=0.5, transform=None):
+                 syn_image_dir, syn_label_dir,
+                 syn_ratio=0.5, total_samples=5261, transform=None):
         """
-        Combines synthetic and real fire datasets using a defined ratio.
-        Always uses full synthetic set, varies real set accordingly.
+        Creates a fixed-size dataset by mixing synthetic and real images based on a target ratio.
 
         Args:
             real_image_dir (str): Path to real images
             real_label_dir (str): Path to real labels
             syn_image_dir (str): Path to synthetic images
             syn_label_dir (str): Path to synthetic labels
-            syn_ratio (float): Ratio of synthetic images (e.g. 0.5 for 50%)
+            syn_ratio (float): Proportion of synthetic images in the total dataset (e.g. 0.5 for 50%)
+            total_samples (int): Total number of images in the dataset (e.g. 5,261)
             transform (callable, optional): torchvision transforms
         """
         self.real_image_dir = real_image_dir
@@ -120,24 +119,33 @@ class FireClassificationMixedDataset(Dataset):
         self.syn_image_dir = syn_image_dir
         self.syn_label_dir = syn_label_dir
         self.transform = transform
+        self.syn_ratio = syn_ratio
+        self.total_samples = total_samples
 
-        # Load and sort file lists
+        # Get available files
         self.real_images = sorted([f for f in os.listdir(real_image_dir) if f.endswith('.jpg')])
         self.syn_images = sorted([f for f in os.listdir(syn_image_dir) if f.endswith('.jpg')])
 
-        self.syn_count = len(self.syn_images)
-        self.real_count = int((self.syn_count / syn_ratio) * (1 - syn_ratio))
+        # Determine target counts for each source
+        target_syn = int(total_samples * syn_ratio)
+        target_real = total_samples - target_syn
 
-        # Subsample real images
-        self.sampled_real_images = random.sample(self.real_images, self.real_count)
+        # Safety check: trim target size if we don’t have enough images
+        target_syn = min(target_syn, len(self.syn_images))
+        target_real = min(target_real, len(self.real_images))
+        self.actual_total = target_syn + target_real  # may be slightly less than total_samples
 
-        # Tag source and merge
-        self.data = [(f, 'real') for f in self.sampled_real_images] + \
-                    [(f, 'syn') for f in self.syn_images]
+        # Sample without replacement
+        self.sampled_syn_images = random.sample(self.syn_images, target_syn)
+        self.sampled_real_images = random.sample(self.real_images, target_real)
+
+        # Label data source and combine
+        self.data = [(f, 'syn') for f in self.sampled_syn_images] + \
+                    [(f, 'real') for f in self.sampled_real_images]
         random.shuffle(self.data)
 
     def __len__(self):
-        return len(self.data)
+        return self.actual_total
 
     def __getitem__(self, idx):
         image_name, source = self.data[idx]
