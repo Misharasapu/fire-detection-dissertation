@@ -101,7 +101,7 @@ class FireClassificationSyntheticDataset(Dataset):
 class FireClassificationMixedDataset(Dataset):
     def __init__(self, real_image_dir, real_label_dir,
                  syn_image_dir, syn_label_dir,
-                 syn_ratio=0.5, total_samples=5261, transform=None):
+                 syn_ratio=0.5, total_samples=5260, transform=None):
         """
         Creates a fixed-size dataset by mixing synthetic and real images based on a target ratio.
 
