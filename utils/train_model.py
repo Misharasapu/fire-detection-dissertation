@@ -12,6 +12,7 @@ def train_model(
     num_epochs,
     device,
     save_path,
+    fine_tune=False,  # 🔧 New argument
     print_every=1,
     print_batch_loss=False
 ):
@@ -27,13 +28,32 @@ def train_model(
         num_epochs (int): Number of epochs.
         device (torch.device): Device to train on (CPU/GPU).
         save_path (str): Path to save the best model.
+        fine_tune (bool): Whether to unfreeze layer4 and fc for fine-tuning.
         print_every (int): Frequency of printing epoch summaries.
         print_batch_loss (bool): Whether to print per-batch loss.
 
     Returns:
         train_losses, val_losses: Lists of training and validation loss per epoch.
     """
+
     print("\n🔍 Model device:", next(model.parameters()).device)
+
+    # 🔓 Optional Fine-Tuning Setup
+    if fine_tune:
+        print("🔧 Fine-tuning mode: Unfreezing layer4 and fc...")
+        for name, param in model.named_parameters():
+            if 'layer4' in name or 'fc' in name:
+                param.requires_grad = True
+            else:
+                param.requires_grad = False
+    else:
+        print("📌 Feature extraction mode: Only fc layer will be trained.")
+        for param in model.parameters():
+            param.requires_grad = False
+        model.fc.requires_grad = True
+
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"📊 Trainable parameters: {trainable_params}")
 
     train_losses, val_losses = [], []
     best_f1 = 0.0
