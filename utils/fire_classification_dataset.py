@@ -124,3 +124,51 @@ class FireClassificationMixedDataset(Dataset):
                         break
 
         return image, torch.tensor(label, dtype=torch.long)
+
+
+
+class FireClassificationMaskDataset(Dataset):
+    """
+    Simple loader for SYN-FIRE (images + masks in PNG).
+    Turns a segmentation mask into a binary label:
+      - 1 (fire) if the mask has any non-zero pixel
+      - 0 (no fire) if the mask is fully black or missing
+    """
+
+    def __init__(self, image_dir, mask_dir, transform=None):
+        self.image_dir = image_dir
+        self.mask_dir = mask_dir
+        self.transform = transform
+
+        # Keep only .png images and sort for reproducibility
+        self.image_files = sorted([f for f in os.listdir(self.image_dir) if f.lower().endswith(".png")])
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        img_name = self.image_files[idx]
+        img_path = os.path.join(self.image_dir, img_name)
+
+        # Mask shares the same stem name as the image (e.g., 000123.png)
+        mask_name = os.path.splitext(img_name)[0] + ".png"
+        mask_path = os.path.join(self.mask_dir, mask_name)
+
+        # Load and transform image
+        image = Image.open(img_path).convert("RGB")
+        if self.transform:
+            image = self.transform(image)
+
+        # Default label = 0 (no fire)
+        label = 0
+
+        # If a mask exists, check whether any pixel > 0
+        if os.path.exists(mask_path):
+            mask = Image.open(mask_path).convert("L")  # grayscale
+            # getextrema() returns (min_pixel_value, max_pixel_value)
+            _, max_val = mask.getextrema()
+            label = 1 if max_val > 0 else 0
+
+        return image, torch.tensor(label, dtype=torch.long)
+
+
