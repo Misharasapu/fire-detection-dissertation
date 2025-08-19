@@ -50,7 +50,9 @@ def train_model(
         print("📌 Feature extraction mode: Only fc layer will be trained.")
         for param in model.parameters():
             param.requires_grad = False
-        model.fc.requires_grad = True
+
+        for param in model.fc.parameters():
+            param.requires_grad = True
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"📊 Trainable parameters: {trainable_params}")
