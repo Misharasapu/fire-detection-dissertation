@@ -12,45 +12,38 @@ def train_model(
     num_epochs,
     device,
     save_path,
-    fine_tune=False,  # 🔧 New argument
     print_every=1,
     print_batch_loss=False
 ):
     """
-    Trains a PyTorch model and saves the best one based on F1 score.
+    Train a PyTorch model and save the best checkpoint based on validation F1.
+
+    Notes:
+      - Freezing/unfreezing of layers must be handled in the notebook
+        before constructing the optimizer.
+      - The optimizer should be created from model parameters that have
+        requires_grad=True.
 
     Args:
-        model (nn.Module): The model to train.
-        train_loader (DataLoader): Dataloader for training data.
-        val_loader (DataLoader): Dataloader for validation data.
+        model (nn.Module): Model to train (with requires_grad already set).
+        train_loader (DataLoader): Training dataloader.
+        val_loader (DataLoader): Validation dataloader.
         criterion (nn.Module): Loss function.
-        optimizer (Optimizer): Optimizer for training.
+        optimizer (Optimizer): Optimizer built on trainable params only.
         num_epochs (int): Number of epochs.
-        device (torch.device): Device to train on (CPU/GPU).
-        save_path (str): Path to save the best model.
-        fine_tune (bool): Whether to unfreeze layer4 and fc for fine-tuning.
-        print_every (int): Frequency of printing epoch summaries.
+        device (torch.device): CPU or CUDA device.
+        save_path (str): Path to save best model (state_dict).
+        print_every (int): Print epoch summaries every N epochs.
         print_batch_loss (bool): Whether to print per-batch loss.
 
     Returns:
-        train_losses, val_losses: Lists of training and validation loss per epoch.
+        (train_losses, val_losses): Lists with per-epoch losses.
     """
 
     print("\n🔍 Model device:", next(model.parameters()).device)
-
-    # 🔓 Optional Fine-Tuning Setup
-    if fine_tune:
-        print("🔧 Fine-tuning mode: Unfreezing layer4 and fc...")
-        for name, param in model.named_parameters():
-            if 'layer4' in name or 'fc' in name:
-                param.requires_grad = True
-            else:
-                param.requires_grad = False
-    else:
-        print("📌 Feature extraction mode: Notebook is responsible for freezing/unfreezing.")
-
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"📊 Trainable parameters: {trainable_params}")
+    assert trainable_params > 0, "No trainable parameters found. Set requires_grad before calling train_model."
 
     train_losses, val_losses = [], []
     best_f1 = 0.0
@@ -59,7 +52,7 @@ def train_model(
         start_time = time.time()
         print(f"\n🔁 Epoch {epoch + 1}/{num_epochs}")
 
-        # --- Training Phase ---
+        # --- Training ---
         model.train()
         running_loss = 0.0
 
@@ -83,7 +76,7 @@ def train_model(
         avg_train_loss = running_loss / len(train_loader)
         train_losses.append(avg_train_loss)
 
-        # --- Validation Phase ---
+        # --- Validation ---
         model.eval()
         val_loss = 0.0
         all_preds, all_labels = [], []
@@ -119,7 +112,7 @@ def train_model(
                   f"F1: {metrics['f1']:.4f} | "
                   f"Time: {time.time() - start_time:.1f}s")
 
-        # --- Save best model ---
+        # --- Save best by F1 ---
         if metrics['f1'] > best_f1:
             best_f1 = metrics['f1']
             torch.save(model.state_dict(), save_path)
