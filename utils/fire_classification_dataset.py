@@ -172,3 +172,64 @@ class FireClassificationMaskDataset(Dataset):
         return image, torch.tensor(label, dtype=torch.long)
 
 
+
+
+class FireClassificationPhase4MixedFixed(Dataset):
+    """
+    Phase 4 helper: fixed-count indoor mixed dataset composed of
+    - PLOS ONE (real) via FireClassificationDataset(dataset_type='plos')
+    - SYN-FIRE (synthetic positives) via FireClassificationMaskDataset
+
+    It samples `n_real` from PLOS and `n_syn` from SYN-FIRE without replacement,
+    shuffles deterministically, and returns (image, label).
+    """
+
+    def __init__(
+        self,
+        real_image_dir, real_label_dir,
+        syn_image_dir, syn_mask_dir,
+        n_real=2000, n_syn=2000,
+        transform=None,
+        seed=42,
+    ):
+        self.transform = transform
+        self.seed = seed
+
+        # Reuse your existing helpers (keeps label rules consistent)
+        self.real_ds = FireClassificationDataset(
+            image_dir=real_image_dir,
+            label_dir=real_label_dir,
+            transform=transform,
+            dataset_type="plos",   # PLOS rule: class_id == 0 -> fire
+        )
+        self.syn_ds = FireClassificationMaskDataset(
+            image_dir=syn_image_dir,
+            mask_dir=syn_mask_dir,
+            transform=transform,
+        )
+
+        # Build deterministic samples
+        rng = random.Random(seed)
+        real_count = min(n_real, len(self.real_ds))
+        syn_count  = min(n_syn,  len(self.syn_ds))
+
+        self.real_indices = rng.sample(range(len(self.real_ds)), real_count)
+        self.syn_indices  = rng.sample(range(len(self.syn_ds)), syn_count)
+
+        # Tag sources and shuffle combined list
+        self._items = [("real", i) for i in self.real_indices] + \
+                      [("syn",  j) for j in self.syn_indices]
+        rng.shuffle(self._items)
+
+    def __len__(self):
+        return len(self._items)
+
+    def __getitem__(self, idx):
+        src, i = self._items[idx]
+        if src == "real":
+            # Delegates to FireClassificationDataset (plos mode)
+            return self.real_ds[i]
+        else:
+            # Delegates to FireClassificationMaskDataset (mask→label)
+            return self.syn_ds[i]
+
