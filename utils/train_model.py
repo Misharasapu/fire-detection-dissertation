@@ -47,12 +47,7 @@ def train_model(
             else:
                 param.requires_grad = False
     else:
-        print("📌 Feature extraction mode: Only fc layer will be trained.")
-        for param in model.parameters():
-            param.requires_grad = False
-
-        for param in model.fc.parameters():
-            param.requires_grad = True
+        print("📌 Feature extraction mode: Notebook is responsible for freezing/unfreezing.")
 
     trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"📊 Trainable parameters: {trainable_params}")
