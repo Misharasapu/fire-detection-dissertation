@@ -2,6 +2,7 @@ import os
 from PIL import Image
 import torch
 from torch.utils.data import Dataset
+import random
 
 class FireClassificationDataset(Dataset):
     def __init__(self, image_dir, label_dir, transform=None, dataset_type="real"):
