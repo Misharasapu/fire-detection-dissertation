@@ -14,6 +14,7 @@ from sklearn.metrics import (
     precision_recall_curve,
     average_precision_score,
     matthews_corrcoef,
+    precision_recall_fscore_support,   # ⇦ NEW
 )
 
 # ------------------------------
@@ -59,17 +60,6 @@ def evaluate_model(
       - Confusion matrix:  {drive}/figures/confusion_matrices/<TESTSET>/<model_name>.png
       - ROC curve:         {drive}/figures/roc_curves/<TESTSET>/<model_name>.png
       - PR curve:          {drive}/figures/pr_curves/<TESTSET>/<model_name>.png
-
-    Args:
-        model_name   (str): e.g. "resnet_outdoor_real_100_phase1"
-        y_true       (Tensor/ndarray/list): ground-truth labels (0/1)
-        y_pred       (Tensor/ndarray/list): predicted labels (0/1), thresholded (e.g., 0.5)
-        y_prob_pos   (Tensor/ndarray/list): positive-class probabilities (float in [0,1])
-        testset_name (str): one of {"D_FIRE","PLOS_ONE","dfire","plosone"}
-        drive_base_dir (str): root of your project on Drive
-
-    Returns:
-        dict of computed metrics (also written to JSON on disk)
     """
     # --- Canonicalise inputs ---
     y_true = _to_numpy_1d(y_true)
@@ -90,19 +80,38 @@ def evaluate_model(
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
 
     # --- Scalar metrics (same definitions your notebook used) ---
-    accuracy   = (tp + tn) / max(1, (tp + tn + fp + fn))
-    precision  = tp / max(1, (tp + fp))  # zero_division handled by max(1,...)
-    recall     = tp / max(1, (tp + fn))  # TPR / sensitivity
-    f1         = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+    accuracy    = (tp + tn) / max(1, (tp + tn + fp + fn))
+    precision   = tp / max(1, (tp + fp))  # positive-class precision
+    recall      = tp / max(1, (tp + fn))  # TPR / sensitivity
+    f1          = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
     specificity = tn / max(1, (tn + fp))  # TNR
-    fpr        = fp / max(1, (fp + tn))
-    fnr        = fn / max(1, (fn + tp))
-    # MCC (robust under imbalance). If predictions are a single class, sklearn returns 0 by definition.
-    mcc        = float(matthews_corrcoef(y_true, y_pred)) if _has_both_classes(y_pred) else 0.0
+    fpr         = fp / max(1, (fp + tn))
+    fnr         = fn / max(1, (fn + tp))
+    mcc         = float(matthews_corrcoef(y_true, y_pred)) if _has_both_classes(y_pred) else 0.0
 
     # Threshold-free summaries
-    roc_auc    = float(roc_auc_score(y_true, y_prob_pos))
-    pr_auc     = float(average_precision_score(y_true, y_prob_pos))  # AP
+    roc_auc     = float(roc_auc_score(y_true, y_prob_pos))
+    pr_auc      = float(average_precision_score(y_true, y_prob_pos))  # AP
+
+    # --- NEW: per-class metrics (separate section) ---
+    # labels fixed as [0,1] so index 0 = no_fire, index 1 = fire
+    prec_arr, rec_arr, f1_arr, sup_arr = precision_recall_fscore_support(
+        y_true, y_pred, labels=[0, 1], zero_division=0
+    )
+    per_class = {
+        "no_fire": {
+            "precision": float(prec_arr[0]),
+            "recall":    float(rec_arr[0]),
+            "f1":        float(f1_arr[0]),
+            "support":   int(sup_arr[0]),
+        },
+        "fire": {
+            "precision": float(prec_arr[1]),
+            "recall":    float(rec_arr[1]),
+            "f1":        float(f1_arr[1]),
+            "support":   int(sup_arr[1]),
+        },
+    }
 
     metrics = {
         "accuracy": accuracy,
@@ -117,6 +126,7 @@ def evaluate_model(
         "pr_auc": pr_auc,
         "tp": int(tp), "tn": int(tn), "fp": int(fp), "fn": int(fn),
         "threshold": 0.5,  # convention used to produce y_pred
+        "per_class": per_class,  # ⇦ NEW: clean, separate section
     }
 
     # --- Save JSON ---
@@ -141,6 +151,7 @@ def evaluate_model(
 
     print(f"✅ Saved metrics and plots for {model_name} on {testset_key}")
     return metrics
+
 
 
 # ------------------------------
