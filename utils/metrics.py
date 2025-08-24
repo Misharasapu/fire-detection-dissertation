@@ -196,8 +196,10 @@ def _plot_confusion_counts(tn, fp, fn, tp, title, save_path):
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
+    plt.savefig(save_path, dpi=150)  # save to Drive
+    plt.show()  # 👈 display inline in notebook
+    plt.close()  # close to free memory
+
 
 def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
     fpr_pts, tpr_pts, _ = roc_curve(y_true, y_prob_pos)
@@ -211,8 +213,10 @@ def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
+    plt.savefig(save_path, dpi=150)  # save to Drive
+    plt.show()  # 👈 display inline in notebook
+    plt.close()  # close to free memory
+
 
 def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
     precision, recall, _ = precision_recall_curve(y_true, y_prob_pos)
@@ -225,5 +229,6 @@ def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
+    plt.savefig(save_path, dpi=150)  # save to Drive
+    plt.show()  # 👈 display inline in notebook
+    plt.close()  # close to free memory
