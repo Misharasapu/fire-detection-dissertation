@@ -17,6 +17,19 @@ from sklearn.metrics import (
     precision_recall_fscore_support,   # ⇦ NEW
 )
 
+
+plt.rcParams.update({
+    "figure.figsize": (4.7, 3.2),  # single-column friendly (~120 mm)
+    "figure.dpi": 300,             # crisp when saved as PNG
+    "font.size": 10,               # legible text
+    "axes.titlesize": 11,
+    "axes.labelsize": 10,
+    "legend.fontsize": 9,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+})
+
+
 # ------------------------------
 # Backwards-compatible basic metrics
 # ------------------------------
@@ -196,9 +209,12 @@ def _plot_confusion_counts(tn, fp, fn, tp, title, save_path):
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)  # save to Drive
-    plt.show()  # 👈 display inline in notebook
-    plt.close()  # close to free memory
+    plt.savefig(save_path, dpi=300)  # high-quality PNG
+    # Optional best quality (vector): also save a PDF next to it
+    pdf_path = save_path.replace(".png", ".pdf")
+    plt.savefig(pdf_path)
+    plt.show()
+    plt.close()
 
 
 def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
@@ -213,9 +229,12 @@ def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)  # save to Drive
-    plt.show()  # 👈 display inline in notebook
-    plt.close()  # close to free memory
+    plt.savefig(save_path, dpi=300)  # high-quality PNG
+    # Optional best quality (vector): also save a PDF next to it
+    pdf_path = save_path.replace(".png", ".pdf")
+    plt.savefig(pdf_path)
+    plt.show()
+    plt.close()
 
 
 def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
@@ -229,6 +248,9 @@ def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)  # save to Drive
-    plt.show()  # 👈 display inline in notebook
-    plt.close()  # close to free memory
+    plt.savefig(save_path, dpi=300)  # high-quality PNG
+    # Optional best quality (vector): also save a PDF next to it
+    pdf_path = save_path.replace(".png", ".pdf")
+    plt.savefig(pdf_path)
+    plt.show()
+    plt.close()
