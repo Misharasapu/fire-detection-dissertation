@@ -16,7 +16,9 @@ The project investigates whether synthetic imagery can reduce reliance on scarce
   - `04_train_resnet_synthetic_only.ipynb` — training with synthetic datasets only (Yunnan or SYN-FIRE).  
   - `05_train_resnet_mixed_ratios.ipynb` — experiments with mixed synthetic–real ratios (25%, 50%, 75%).  
   - `06_train_resnet_finetuned.ipynb` — fine-tuned outdoor models, unfreezing `layer4` and the classification head.  
+  - `07_train_resnet_indoor_models.ipynb` — indoor deployment experiments (PLOS ONE real-only, and PLOS ONE + SYN-FIRE 50/50 mix).  
   - `evaluate_models.ipynb` — evaluation pipeline, including metrics, confusion matrices, and Grad-CAM visualisations.  
+
 
 - **Utils**  
   Python helper modules providing reusable functionality:
