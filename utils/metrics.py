@@ -1,8 +1,9 @@
 import os
 import json
+from typing import Any, Dict, Iterable
+
 import numpy as np
 import matplotlib.pyplot as plt
-
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -14,119 +15,121 @@ from sklearn.metrics import (
     precision_recall_curve,
     average_precision_score,
     matthews_corrcoef,
-    precision_recall_fscore_support,   # ⇦ NEW
+    precision_recall_fscore_support,
 )
 
-
-plt.rcParams.update({
-    "figure.figsize": (4.7, 3.2),  # single-column friendly (~120 mm)
-    "figure.dpi": 300,             # crisp when saved as PNG
-    "font.size": 10,               # legible text
-    "axes.titlesize": 11,
-    "axes.labelsize": 10,
-    "legend.fontsize": 9,
-    "xtick.labelsize": 9,
-    "ytick.labelsize": 9,
-})
+# Presentation-friendly defaults (single-column figures, crisp PNGs)
+plt.rcParams.update(
+    {
+        "figure.figsize": (4.7, 3.2),  # ~120 mm
+        "figure.dpi": 300,
+        "font.size": 10,
+        "axes.titlesize": 11,
+        "axes.labelsize": 10,
+        "legend.fontsize": 9,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+    }
+)
 
 
 # ------------------------------
 # Backwards-compatible basic metrics
 # ------------------------------
-def calculate_metrics(labels, preds):
+def calculate_metrics(labels: Iterable[Any], preds: Iterable[Any]) -> Dict[str, float]:
     """
-    Computes accuracy, precision, recall, and F1 score.
+    Compute accuracy, precision, recall, and F1 score for binary classification.
 
     Args:
-        labels (Tensor/ndarray/list): Ground-truth class labels (0/1).
-        preds  (Tensor/ndarray/list): Predicted class labels (0/1).
+        labels: Ground-truth class labels (0/1).
+        preds: Predicted class labels (0/1).
 
     Returns:
-        dict: {accuracy, precision, recall, f1}
+        A dictionary with keys: 'accuracy', 'precision', 'recall', 'f1'.
     """
-    # Accept torch.Tensors or numpy/list; convert to numpy for sklearn
     labels_np = _to_numpy_1d(labels)
-    preds_np  = _to_numpy_1d(preds)
+    preds_np = _to_numpy_1d(preds)
 
     return {
-        "accuracy":  accuracy_score(labels_np, preds_np),
+        "accuracy": accuracy_score(labels_np, preds_np),
         "precision": precision_score(labels_np, preds_np, zero_division=0),
-        "recall":    recall_score(labels_np, preds_np, zero_division=0),
-        "f1":        f1_score(labels_np, preds_np, zero_division=0),
+        "recall": recall_score(labels_np, preds_np, zero_division=0),
+        "f1": f1_score(labels_np, preds_np, zero_division=0),
     }
 
 
 # ------------------------------
-# New: One-call evaluation + saving
+# One-call evaluation + saving
 # ------------------------------
 def evaluate_model(
-    model_name,
-    y_true,
-    y_pred,
-    y_prob_pos,
-    testset_name,
-    drive_base_dir="/content/drive/MyDrive/fire-detection-dissertation",
-):
+    model_name: str,
+    y_true: Iterable[Any],
+    y_pred: Iterable[Any],
+    y_prob_pos: Iterable[float],
+    testset_name: str,
+    drive_base_dir: str = "/content/drive/MyDrive/fire-detection-dissertation",
+) -> Dict[str, Any]:
     """
-    Compute all metrics, then save:
-      - JSON metrics to:   {drive}/results/metrics/<TESTSET>/<model_name>.json
-      - Confusion matrix:  {drive}/figures/confusion_matrices/<TESTSET>/<model_name>.png
-      - ROC curve:         {drive}/figures/roc_curves/<TESTSET>/<model_name>.png
-      - PR curve:          {drive}/figures/pr_curves/<TESTSET>/<model_name>.png
+    Compute metrics and save artifacts to disk:
+      - JSON metrics:   {drive}/results/metrics/<TESTSET>/<model_name>.json
+      - Confusion png:  {drive}/figures/confusion_matrices/<TESTSET>/<model_name>.png
+      - ROC curve png:  {drive}/figures/roc_curves/<TESTSET>/<model_name>.png
+      - PR curve png:   {drive}/figures/pr_curves/<TESTSET>/<model_name>.png
+    Also shows figures inline in notebooks via plt.show().
     """
     # --- Canonicalise inputs ---
-    y_true = _to_numpy_1d(y_true)
-    y_pred = _to_numpy_1d(y_pred)
-    y_prob_pos = _to_numpy_1d(y_prob_pos).astype(float)
+    y_true_np = _to_numpy_1d(y_true)
+    y_pred_np = _to_numpy_1d(y_pred)
+    y_prob_np = _to_numpy_1d(y_prob_pos).astype(float)
 
     testset_key = _canon_testset_name(testset_name)  # -> "D_FIRE" or "PLOS_ONE"
 
-    # --- Output paths (match your project layout) ---
+    # --- Output paths (match repo layout) ---
     metrics_dir = os.path.join(drive_base_dir, "results", "metrics", testset_key)
-    fig_cm_dir  = os.path.join(drive_base_dir, "figures", "confusion_matrices", testset_key)
+    fig_cm_dir = os.path.join(drive_base_dir, "figures", "confusion_matrices", testset_key)
     fig_roc_dir = os.path.join(drive_base_dir, "figures", "roc_curves", testset_key)
-    fig_pr_dir  = os.path.join(drive_base_dir, "figures", "pr_curves", testset_key)
+    fig_pr_dir = os.path.join(drive_base_dir, "figures", "pr_curves", testset_key)
     for d in (metrics_dir, fig_cm_dir, fig_roc_dir, fig_pr_dir):
         os.makedirs(d, exist_ok=True)
 
-    # --- Confusion counts (labels order fixed as [0,1]) ---
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()
+    # --- Confusion counts (labels order fixed as [0, 1]) ---
+    tn, fp, fn, tp = confusion_matrix(y_true_np, y_pred_np, labels=[0, 1]).ravel()
 
-    # --- Scalar metrics (same definitions your notebook used) ---
-    accuracy    = (tp + tn) / max(1, (tp + tn + fp + fn))
-    precision   = tp / max(1, (tp + fp))  # positive-class precision
-    recall      = tp / max(1, (tp + fn))  # TPR / sensitivity
-    f1          = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+    # --- Thresholded scalar metrics ---
+    total = max(1, (tp + tn + fp + fn))
+    accuracy = (tp + tn) / total
+    precision = tp / max(1, (tp + fp))  # positive-class precision
+    recall = tp / max(1, (tp + fn))  # TPR / sensitivity
+    f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
     specificity = tn / max(1, (tn + fp))  # TNR
-    fpr         = fp / max(1, (fp + tn))
-    fnr         = fn / max(1, (fn + tp))
-    mcc         = float(matthews_corrcoef(y_true, y_pred)) if _has_both_classes(y_pred) else 0.0
+    fpr = fp / max(1, (fp + tn))
+    fnr = fn / max(1, (fn + tp))
+    mcc = float(matthews_corrcoef(y_true_np, y_pred_np)) if _has_both_classes(y_pred_np) else 0.0
 
-    # Threshold-free summaries
-    roc_auc     = float(roc_auc_score(y_true, y_prob_pos))
-    pr_auc      = float(average_precision_score(y_true, y_prob_pos))  # AP
+    # --- Threshold-free summaries ---
+    roc_auc = float(roc_auc_score(y_true_np, y_prob_np))
+    pr_auc = float(average_precision_score(y_true_np, y_prob_np))  # AP
 
-    # --- NEW: per-class metrics (separate section) ---
-    # labels fixed as [0,1] so index 0 = no_fire, index 1 = fire
+    # --- Per-class metrics (labels fixed [0, 1] => 0=no_fire, 1=fire) ---
     prec_arr, rec_arr, f1_arr, sup_arr = precision_recall_fscore_support(
-        y_true, y_pred, labels=[0, 1], zero_division=0
+        y_true_np, y_pred_np, labels=[0, 1], zero_division=0
     )
     per_class = {
         "no_fire": {
             "precision": float(prec_arr[0]),
-            "recall":    float(rec_arr[0]),
-            "f1":        float(f1_arr[0]),
-            "support":   int(sup_arr[0]),
+            "recall": float(rec_arr[0]),
+            "f1": float(f1_arr[0]),
+            "support": int(sup_arr[0]),
         },
         "fire": {
             "precision": float(prec_arr[1]),
-            "recall":    float(rec_arr[1]),
-            "f1":        float(f1_arr[1]),
-            "support":   int(sup_arr[1]),
+            "recall": float(rec_arr[1]),
+            "f1": float(f1_arr[1]),
+            "support": int(sup_arr[1]),
         },
     }
 
-    metrics = {
+    metrics: Dict[str, Any] = {
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
@@ -137,9 +140,12 @@ def evaluate_model(
         "mcc": mcc,
         "roc_auc": roc_auc,
         "pr_auc": pr_auc,
-        "tp": int(tp), "tn": int(tn), "fp": int(fp), "fn": int(fn),
+        "tp": int(tp),
+        "tn": int(tn),
+        "fp": int(fp),
+        "fn": int(fn),
         "threshold": 0.5,  # convention used to produce y_pred
-        "per_class": per_class,  # ⇦ NEW: clean, separate section
+        "per_class": per_class,
     }
 
     # --- Save JSON ---
@@ -147,46 +153,55 @@ def evaluate_model(
     with open(json_path, "w") as f:
         json.dump(metrics, f, indent=4)
 
-    # --- Confusion matrix plot (counts) ---
-    _plot_confusion_counts(tn, fp, fn, tp,
-                           title=f"Confusion Matrix – {model_name}",
-                           save_path=os.path.join(fig_cm_dir, f"{model_name}.png"))
+    # --- Plots (display in notebook AND save to disk) ---
+    _plot_confusion_counts(
+        tn,
+        fp,
+        fn,
+        tp,
+        title=f"Confusion Matrix – {model_name}",
+        save_path=os.path.join(fig_cm_dir, f"{model_name}.png"),
+    )
+    _plot_roc_curve(
+        y_true_np,
+        y_prob_np,
+        title=f"ROC – {model_name} (AUC={roc_auc:.3f})",
+        save_path=os.path.join(fig_roc_dir, f"{model_name}.png"),
+    )
+    _plot_pr_curve(
+        y_true_np,
+        y_prob_np,
+        title=f"PR – {model_name} (AP={pr_auc:.3f})",
+        save_path=os.path.join(fig_pr_dir, f"{model_name}.png"),
+    )
 
-    # --- ROC curve ---
-    _plot_roc_curve(y_true, y_prob_pos,
-                    title=f"ROC – {model_name} (AUC={roc_auc:.3f})",
-                    save_path=os.path.join(fig_roc_dir, f"{model_name}.png"))
-
-    # --- PR curve ---
-    _plot_pr_curve(y_true, y_prob_pos,
-                   title=f"PR – {model_name} (AP={pr_auc:.3f})",
-                   save_path=os.path.join(fig_pr_dir, f"{model_name}.png"))
-
-    print(f"✅ Saved metrics and plots for {model_name} on {testset_key}")
+    print(f"Saved metrics and plots for {model_name} on {testset_key}")
     return metrics
-
 
 
 # ------------------------------
 # Internal helpers
 # ------------------------------
-def _to_numpy_1d(x):
-    """Accept torch.Tensor, list, or ndarray; return 1D np.ndarray."""
+def _to_numpy_1d(x: Iterable[Any]) -> np.ndarray:
+    """Accept torch.Tensor, list, or ndarray; return a 1D np.ndarray."""
     try:
-        import torch
+        import torch  # local import to avoid hard dependency for non-torch usage
         if isinstance(x, torch.Tensor):
             x = x.detach().cpu().numpy()
     except Exception:
+        # If torch is unavailable or x is not a Tensor, fall through to numpy
         pass
-    x = np.asarray(x)
-    return x.reshape(-1)
+    arr = np.asarray(x)
+    return arr.reshape(-1)
 
-def _has_both_classes(y_pred_np):
-    """Return True if predictions contain both 0 and 1 (avoids undefined MCC edge cases)."""
+
+def _has_both_classes(y_pred_np: np.ndarray) -> bool:
+    """True if predictions contain both 0 and 1 (avoids undefined MCC edge cases)."""
     u = np.unique(y_pred_np)
     return (0 in u) and (1 in u)
 
-def _canon_testset_name(name):
+
+def _canon_testset_name(name: str) -> str:
     """Map a loose name to the canonical folder name used in the repo."""
     n = str(name).strip().lower().replace(" ", "")
     if n in {"dfire", "d_fire", "d-fire", "d"}:
@@ -195,29 +210,30 @@ def _canon_testset_name(name):
         return "PLOS_ONE"
     raise ValueError(f"Unknown testset_name: {name!r}. Expected 'dfire' or 'plosone'.")
 
-def _plot_confusion_counts(tn, fp, fn, tp, title, save_path):
-    cm = np.array([[tn, fp],
-                   [fn, tp]])
+
+def _plot_confusion_counts(tn: int, fp: int, fn: int, tp: int, title: str, save_path: str) -> None:
+    cm = np.array([[tn, fp], [fn, tp]])
     plt.figure()
     plt.imshow(cm, cmap="Blues")
     plt.title(title)
     for i in range(2):
         for j in range(2):
             plt.text(j, i, int(cm[i, j]), ha="center", va="center", color="red", fontsize=12)
-    plt.xticks([0,1], ["No Fire", "Fire"])
-    plt.yticks([0,1], ["No Fire", "Fire"])
+    plt.xticks([0, 1], ["No Fire", "Fire"])
+    plt.yticks([0, 1], ["No Fire", "Fire"])
     plt.xlabel("Predicted")
     plt.ylabel("True")
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300)  # high-quality PNG
-    # Optional best quality (vector): also save a PDF next to it
+    plt.savefig(save_path, dpi=300)
+    # Also save vector PDF
     pdf_path = save_path.replace(".png", ".pdf")
     plt.savefig(pdf_path)
+    # Keep inline display for notebooks
     plt.show()
     plt.close()
 
 
-def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
+def _plot_roc_curve(y_true: np.ndarray, y_prob_pos: np.ndarray, title: str, save_path: str) -> None:
     fpr_pts, tpr_pts, _ = roc_curve(y_true, y_prob_pos)
     auc_val = roc_auc_score(y_true, y_prob_pos)
     plt.figure()
@@ -229,15 +245,16 @@ def _plot_roc_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300)  # high-quality PNG
-    # Optional best quality (vector): also save a PDF next to it
+    plt.savefig(save_path, dpi=300)
+    # Also save vector PDF
     pdf_path = save_path.replace(".png", ".pdf")
     plt.savefig(pdf_path)
+    # Keep inline display for notebooks
     plt.show()
     plt.close()
 
 
-def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
+def _plot_pr_curve(y_true: np.ndarray, y_prob_pos: np.ndarray, title: str, save_path: str) -> None:
     precision, recall, _ = precision_recall_curve(y_true, y_prob_pos)
     ap = average_precision_score(y_true, y_prob_pos)
     plt.figure()
@@ -248,9 +265,10 @@ def _plot_pr_curve(y_true, y_prob_pos, title, save_path):
     plt.legend()
     plt.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(save_path, dpi=300)  # high-quality PNG
-    # Optional best quality (vector): also save a PDF next to it
+    plt.savefig(save_path, dpi=300)
+    # Also save vector PDF
     pdf_path = save_path.replace(".png", ".pdf")
     plt.savefig(pdf_path)
+    # Keep inline display for notebooks
     plt.show()
     plt.close()
